@@ -1,19 +1,6 @@
-terraform {
-  required_providers {
-    kubernetes = {
-      source  = "hashicorp/kubernetes"
-      version = "~> 2.25"
-    }
-  }
-}
-
-provider "kubernetes" {
-  config_path = "~/.kube/config"
-}
-
-############################
-# NGINX DEPLOYMENT
-############################
+###########################
+# Kubernetes Deployment for Nginx
+###########################
 resource "kubernetes_deployment" "nginx" {
   metadata {
     name = "nginx"
@@ -52,6 +39,9 @@ resource "kubernetes_deployment" "nginx" {
   }
 }
 
+###########################
+# Kubernetes Service for Nginx
+###########################
 resource "kubernetes_service" "nginx" {
   metadata {
     name = "nginx-service"
@@ -59,7 +49,7 @@ resource "kubernetes_service" "nginx" {
 
   spec {
     selector = {
-      app = "nginx"
+      app = kubernetes_deployment.nginx.metadata[0].labels.app
     }
 
     type = "NodePort"
@@ -67,14 +57,14 @@ resource "kubernetes_service" "nginx" {
     port {
       port        = 80
       target_port = 80
-      node_port  = 30080
+      node_port   = 30080
     }
   }
 }
 
-############################
-# MYSQL DEPLOYMENT
-############################
+###########################
+# Kubernetes Deployment for MySQL
+###########################
 resource "kubernetes_deployment" "mysql" {
   metadata {
     name = "mysql"
@@ -106,7 +96,12 @@ resource "kubernetes_deployment" "mysql" {
 
           env {
             name  = "MYSQL_ROOT_PASSWORD"
-            value = "password"
+            value = "rootpassword"
+          }
+
+          env {
+            name  = "MYSQL_DATABASE"
+            value = "testdb"
           }
 
           port {
@@ -118,6 +113,9 @@ resource "kubernetes_deployment" "mysql" {
   }
 }
 
+###########################
+# Kubernetes Service for MySQL
+###########################
 resource "kubernetes_service" "mysql" {
   metadata {
     name = "mysql-service"
@@ -125,7 +123,7 @@ resource "kubernetes_service" "mysql" {
 
   spec {
     selector = {
-      app = "mysql"
+      app = kubernetes_deployment.mysql.metadata[0].labels.app
     }
 
     type = "ClusterIP"
@@ -135,4 +133,15 @@ resource "kubernetes_service" "mysql" {
       target_port = 3306
     }
   }
+}
+
+###########################
+# Outputs
+###########################
+output "nginx_node_port" {
+  value = kubernetes_service.nginx.spec[0].node_port
+}
+
+output "mysql_service_cluster_ip" {
+  value = kubernetes_service.mysql.spec[0].cluster_ip
 }
