@@ -1,44 +1,53 @@
-name: Ephemeral Test Pipeline
+name: Terraform + Kubernetes CI
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Download code
-      uses: actions/checkout@v3
+      # 1️⃣ Checkout repository
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Install Terraform
-      uses: hashicorp/setup-terraform@v2
+      # 2️⃣ Install Terraform
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
 
-    - name: Install kubectl
-      run: |
-        curl -LO https://dl.k8s.io/release/stable.txt
-        curl -LO https://dl.k8s.io/release/$(cat stable.txt)/bin/linux/amd64/kubectl
-        chmod +x kubectl
-        sudo mv kubectl /usr/local/bin/
+      # 3️⃣ Install kubectl
+      - name: Install kubectl
+        run: |
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
 
-    - name: Install kind
-      run: |
-        curl -Lo kind https://kind.sigs.k8s.io/dl/v0.31.0/kind-linux-amd64
-        chmod +x kind
-        sudo mv kind /usr/local/bin/
+      # 4️⃣ Install KIND
+      - name: Install KIND
+        run: |
+          curl -Lo kind https://kind.sigs.k8s.io/dl/v0.31.0/kind-linux-amd64
+          chmod +x kind
+          sudo mv kind /usr/local/bin/
 
-    - name: Create Kubernetes cluster
-      run: kind create cluster
+      # 5️⃣ Create KIND cluster
+      - name: Create Kubernetes cluster (KIND)
+        run: |
+          kind create cluster
+          kubectl cluster-info
+          kubectl get nodes
 
-    - name: Terraform Init
-      run: terraform init
+      # 🔑 6️⃣ Export kubeconfig (THIS FIXES YOUR ERROR)
+      - name: Export kubeconfig
+        run: |
+          echo "KUBECONFIG=$HOME/.kube/config" >> $GITHUB_ENV
 
-    - name: Terraform Apply
-      run: terraform apply -auto-approve
+      # 7️⃣ Terraform Init
+      - name: Terraform Init
+        run: terraform init
 
-    - name: Verify Pods
-      run: kubectl get pods
-
-    - name: Terraform Destroy
-      run: terraform destroy -auto-approve
+      # 8️⃣ Terraform Apply
+      - name: Terraform Apply
+        run: terraform apply -auto-approve
