@@ -14,7 +14,7 @@ terraform {
 }
 
 provider "kubernetes" {
-  config_path = "~/.kube/config" # Use this if using local kubeconfig (kind)
+  config_path = "~/.kube/config" # for local kind cluster
 }
 
 provider "docker" {}
