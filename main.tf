@@ -1,27 +1,6 @@
-// main.tf
-
-terraform {
-  required_providers {
-    kubernetes = {
-      source  = "hashicorp/kubernetes"
-      version = "~> 2.26.1"
-    }
-    docker = {
-      source  = "kreuzwerker/docker"
-      version = "~> 3.6.2"
-    }
-  }
-}
-
-provider "kubernetes" {
-  config_path = "~/.kube/config"
-}
-
-provider "docker" {}
-
-# -----------------------------
+# ----------------------------
 # Nginx Deployment
-# -----------------------------
+# ----------------------------
 resource "kubernetes_deployment" "nginx" {
   metadata {
     name = "nginx"
@@ -32,6 +11,7 @@ resource "kubernetes_deployment" "nginx" {
 
   spec {
     replicas = 1
+
     selector {
       match_labels = {
         app = "nginx"
@@ -59,9 +39,9 @@ resource "kubernetes_deployment" "nginx" {
   }
 }
 
-# -----------------------------
+# ----------------------------
 # Nginx Service
-# -----------------------------
+# ----------------------------
 resource "kubernetes_service" "nginx" {
   metadata {
     name = "nginx-service"
@@ -71,19 +51,20 @@ resource "kubernetes_service" "nginx" {
     selector = {
       app = kubernetes_deployment.nginx.metadata[0].labels.app
     }
-    type = "NodePort"
 
     port {
       port        = 80
       target_port = 80
       node_port   = 30080
     }
+
+    type = "NodePort"
   }
 }
 
-# -----------------------------
+# ----------------------------
 # MySQL Deployment
-# -----------------------------
+# ----------------------------
 resource "kubernetes_deployment" "mysql" {
   metadata {
     name = "mysql"
@@ -94,6 +75,7 @@ resource "kubernetes_deployment" "mysql" {
 
   spec {
     replicas = 1
+
     selector {
       match_labels = {
         app = "mysql"
@@ -114,7 +96,7 @@ resource "kubernetes_deployment" "mysql" {
 
           env {
             name  = "MYSQL_ROOT_PASSWORD"
-            value = "rootpass"
+            value = "root123"
           }
 
           port {
@@ -126,9 +108,9 @@ resource "kubernetes_deployment" "mysql" {
   }
 }
 
-# -----------------------------
+# ----------------------------
 # MySQL Service
-# -----------------------------
+# ----------------------------
 resource "kubernetes_service" "mysql" {
   metadata {
     name = "mysql-service"
@@ -138,11 +120,12 @@ resource "kubernetes_service" "mysql" {
     selector = {
       app = kubernetes_deployment.mysql.metadata[0].labels.app
     }
-    type = "ClusterIP"
 
     port {
       port        = 3306
       target_port = 3306
     }
+
+    type = "ClusterIP"
   }
 }
