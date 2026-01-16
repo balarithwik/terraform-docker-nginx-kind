@@ -8,6 +8,6 @@ terraform {
 }
 
 provider "kubernetes" {
-  # Explicit path to your kubeconfig
-  config_path = "C:/Users/Bala/.kube/config"
+  # Use kubeconfig automatically (works locally + CI)
+  config_path = null
 }
