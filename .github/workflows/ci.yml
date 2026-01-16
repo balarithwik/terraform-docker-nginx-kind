@@ -1,4 +1,4 @@
-name: Terraform + Kubernetes CI
+name: Terraform + Kubernetes Ephemeral CI
 
 on:
   push:
@@ -6,11 +6,11 @@ on:
       - main
 
 jobs:
-  deploy:
+  deploy-test-destroy:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
+    - name: Checkout code
       uses: actions/checkout@v4
 
     - name: Install Docker
@@ -22,13 +22,16 @@ jobs:
         chmod +x kind
         sudo mv kind /usr/local/bin/kind
 
-    - name: Create Kubernetes cluster
+    - name: Create kind cluster
       run: |
         kind create cluster
         kubectl cluster-info
+        kubectl get nodes
 
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.6.6
 
     - name: Terraform Init
       run: terraform init
@@ -36,14 +39,27 @@ jobs:
     - name: Terraform Apply
       run: terraform apply -auto-approve
 
-    - name: Wait for MySQL
+    - name: Wait for pods
       run: |
+        kubectl wait --for=condition=ready pod -l app=nginx --timeout=120s
         kubectl wait --for=condition=ready pod -l app=mysql --timeout=120s
 
-    - name: Validate MySQL
+    - name: Validate Nginx HTTP 200
+      run: |
+        kubectl port-forward svc/nginx-service 8080:80 &
+        sleep 15
+        STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080)
+        echo "Nginx HTTP status: $STATUS"
+        if [ "$STATUS" != "200" ]; then
+          echo "Nginx validation failed"
+          exit 1
+        fi
+
+    - name: Validate MySQL query
       run: |
         MYSQL_POD=$(kubectl get pods -l app=mysql -o jsonpath="{.items[0].metadata.name}")
-        kubectl exec $MYSQL_POD -- mysql -uroot -ppassword -e "SELECT 1;"
+        kubectl exec $MYSQL_POD -- \
+          mysql -uroot -prootpassword -e "SELECT 1;" 
 
     - name: Terraform Destroy
       if: always()
