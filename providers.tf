@@ -2,11 +2,11 @@ terraform {
   required_providers {
     kubernetes = {
       source  = "hashicorp/kubernetes"
-      version = "~> 2.26.1"
+      version = "2.25.2"
     }
     docker = {
       source  = "kreuzwerker/docker"
-      version = "~> 3.6.2"
+      version = "3.6.2"
     }
   }
 
