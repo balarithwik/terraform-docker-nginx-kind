@@ -18,3 +18,4 @@ provider "kubernetes" {
 }
 
 provider "docker" {}
+
