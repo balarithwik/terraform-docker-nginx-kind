@@ -1,6 +1,6 @@
-# ----------------------------
-# Nginx Deployment
-# ----------------------------
+########################
+# NGINX Deployment
+########################
 resource "kubernetes_deployment" "nginx" {
   metadata {
     name = "nginx"
@@ -36,12 +36,14 @@ resource "kubernetes_deployment" "nginx" {
         }
       }
     }
+
+    strategy {}
   }
 }
 
-# ----------------------------
-# Nginx Service
-# ----------------------------
+########################
+# NGINX Service
+########################
 resource "kubernetes_service" "nginx" {
   metadata {
     name = "nginx-service"
@@ -62,9 +64,9 @@ resource "kubernetes_service" "nginx" {
   }
 }
 
-# ----------------------------
-# MySQL Deployment
-# ----------------------------
+########################
+# MYSQL Deployment
+########################
 resource "kubernetes_deployment" "mysql" {
   metadata {
     name = "mysql"
@@ -96,7 +98,7 @@ resource "kubernetes_deployment" "mysql" {
 
           env {
             name  = "MYSQL_ROOT_PASSWORD"
-            value = "root123"
+            value = "root"
           }
 
           port {
@@ -105,12 +107,14 @@ resource "kubernetes_deployment" "mysql" {
         }
       }
     }
+
+    strategy {}
   }
 }
 
-# ----------------------------
-# MySQL Service
-# ----------------------------
+########################
+# MYSQL Service
+########################
 resource "kubernetes_service" "mysql" {
   metadata {
     name = "mysql-service"
