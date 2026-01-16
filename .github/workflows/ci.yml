@@ -1,4 +1,4 @@
-name: Terraform + KIND + Kubernetes
+name: Terraform + Kubernetes Ephemeral Test
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  deploy:
+  deploy-and-test:
     runs-on: ubuntu-latest
 
     steps:
@@ -14,44 +14,52 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Install Terraform
-      - name: Install Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.6.6
+      # 2️⃣ Install Docker (already present, but ensure running)
+      - name: Verify Docker
+        run: docker version
 
-      # 3️⃣ Install kubectl
-      - name: Install kubectl
-        uses: azure/setup-kubectl@v4
-        with:
-          version: v1.29.0
-
-      # 4️⃣ Install KIND
+      # 3️⃣ Install KIND
       - name: Install KIND
         run: |
           curl -Lo kind https://kind.sigs.k8s.io/dl/v0.31.0/kind-linux-amd64
           chmod +x kind
           sudo mv kind /usr/local/bin/kind
 
-      # 5️⃣ Create KIND cluster
+      # 4️⃣ Create Kubernetes cluster
       - name: Create KIND cluster
         run: kind create cluster
 
-      # 6️⃣ Export kubeconfig (🔥 MOST IMPORTANT STEP)
-      - name: Export kubeconfig
-        run: |
-          mkdir -p $HOME/.kube
-          kind get kubeconfig > $HOME/.kube/config
-          echo "KUBECONFIG=$HOME/.kube/config" >> $GITHUB_ENV
+      # 5️⃣ Setup kubectl
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
 
-      # 7️⃣ Verify cluster
-      - name: Verify Kubernetes cluster
-        run: kubectl get nodes
+      # 6️⃣ Install Terraform
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
 
-      # 8️⃣ Terraform Init
+      # 7️⃣ Terraform Init
       - name: Terraform Init
         run: terraform init
 
-      # 9️⃣ Terraform Apply
+      # 8️⃣ Terraform Apply (Deploy nginx)
       - name: Terraform Apply
         run: terraform apply -auto-approve
+
+      # 9️⃣ Verify nginx (CI-style verification)
+      - name: Verify nginx is running
+        run: |
+          kubectl get pods
+          kubectl get svc
+          kubectl port-forward svc/nginx-service 8080:80 &
+          sleep 5
+          curl -I http://localhost:8080
+
+      # 🔟 Destroy infrastructure (ALWAYS runs)
+      - name: Terraform Destroy
+        if: always()
+        run: terraform destroy -auto-approve
+
+      # 1️⃣1️⃣ Delete KIND cluster
+      - name: Delete KIND cluster
+        if: always()
+        run: kind delete cluster
