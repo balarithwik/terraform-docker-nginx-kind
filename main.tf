@@ -1,130 +1,87 @@
-# nginx deployment
-resource "kubernetes_deployment" "nginx" {
-  metadata {
-    name = "nginx"
-  }
+name: Terraform + Kubernetes CI
 
-  spec {
-    replicas = 1
+on:
+  push:
+    branches:
+      - main
 
-    selector {
-      match_labels = {
-        app = "nginx"
-      }
-    }
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
 
-    template {
-      metadata {
-        labels = {
-          app = "nginx"
-        }
-      }
+    steps:
+    # -------------------------
+    # STEP 1: Checkout code
+    # -------------------------
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      spec {
-        container {
-          name  = "nginx"
-          image = "nginx:latest"
+    # -------------------------
+    # STEP 2: Install Docker
+    # -------------------------
+    - name: Install Docker
+      uses: docker/setup-buildx-action@v3
 
-          port {
-            container_port = 80
-          }
-        }
-      }
-    }
-  }
-}
+    # -------------------------
+    # STEP 3: Install kind (Kubernetes in Docker)
+    # -------------------------
+    - name: Install kind
+      run: |
+        curl -Lo kind https://kind.sigs.k8s.io/dl/v0.31.0/kind-linux-amd64
+        chmod +x kind
+        sudo mv kind /usr/local/bin/kind
 
-# nginx service
-resource "kubernetes_service" "nginx" {
-  metadata {
-    name = "nginx-service"
-  }
+    # -------------------------
+    # STEP 4: Create kind cluster
+    # -------------------------
+    - name: Create Kubernetes cluster
+      run: |
+        kind create cluster
+        kubectl cluster-info
 
-  spec {
-    selector = {
-      app = "nginx"  # updated to direct label reference
-    }
+    # -------------------------
+    # STEP 5: Install Terraform
+    # -------------------------
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
 
-    port {
-      port        = 80
-      target_port = 80
-      node_port   = 30080  # optional fixed NodePort
-    }
+    # -------------------------
+    # STEP 6: Terraform Init
+    # -------------------------
+    - name: Terraform Init
+      run: terraform init
 
-    type = "NodePort"
-  }
+    # -------------------------
+    # STEP 7: Terraform Apply (Deploy Nginx + MySQL)
+    # -------------------------
+    - name: Terraform Apply
+      run: terraform apply -auto-approve
 
-}
+    # =================================================
+    # ✅ STEP 8: WAIT FOR MYSQL (THIS IS THE STEP YOU ASKED ABOUT)
+    # =================================================
+    - name: Wait for MySQL Pod to be Ready
+      run: |
+        kubectl wait --for=condition=ready pod -l app=mysql --timeout=120s
 
-################################
-# MYSQL DEPLOYMENT (ADDED)
-################################
-resource "kubernetes_deployment" "mysql" {
-  metadata {
-    name = "mysql"
-    labels = {
-      app = "mysql"
-    }
-  }
+    # =================================================
+    # ✅ STEP 9: AUTOMATED SQL QUERY VALIDATION
+    # =================================================
+    - name: Validate MySQL using SQL query
+      run: |
+        MYSQL_POD=$(kubectl get pods -l app=mysql -o jsonpath="{.items[0].metadata.name}")
+        kubectl exec $MYSQL_POD -- \
+          mysql -uroot -ppassword -e "SELECT 1;"
 
-  spec {
-    replicas = 1
+    # -------------------------
+    # STEP 10: Verify Nginx Pod
+    # -------------------------
+    - name: Verify Nginx Pod
+      run: kubectl get pods
 
-    selector {
-      match_labels = {
-        app = "mysql"
-      }
-    }
-
-    template {
-      metadata {
-        labels = {
-          app = "mysql"
-        }
-      }
-
-      spec {
-        container {
-          name  = "mysql"
-          image = "mysql:8.0"
-
-          env {
-            name  = "MYSQL_ROOT_PASSWORD"
-            value = "rootpassword"
-          }
-
-          env {
-            name  = "MYSQL_DATABASE"
-            value = "appdb"
-          }
-
-          port {
-            container_port = 3306
-          }
-        }
-      }
-    }
-  }
-}
-
-################################
-# MYSQL SERVICE (ADDED)
-################################
-resource "kubernetes_service" "mysql" {
-  metadata {
-    name = "mysql-service"
-  }
-
-  spec {
-    selector = {
-      app = "mysql"
-    }
-
-    type = "ClusterIP"
-
-    port {
-      port        = 3306
-      target_port = 3306
-    }
-  }
-}
+    # -------------------------
+    # STEP 11: Terraform Destroy (Cleanup)
+    # -------------------------
+    - name: Terraform Destroy
+      if: always()
+      run: terraform destroy -auto-approve
